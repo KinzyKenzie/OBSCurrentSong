@@ -7,4 +7,5 @@
 
 # Loose files
 *.csproj
+*.csproj.*
 *.sln

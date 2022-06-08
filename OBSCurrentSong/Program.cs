@@ -7,14 +7,9 @@
 /// Old code sourced through dnSpy from OBSCurrentSong Release V1.28
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 namespace OBSCurrentSong
@@ -22,27 +17,30 @@ namespace OBSCurrentSong
 
     public class Config
     {
-        public string spacing = null;
-        public string subprefix = null;
-        public string separator = null;
+        public int waittime = 3000;
+        public string prefix = null;
+        public string separator = " by ";
+        public string postfix = null;
     }
 
     class Program
     {
+        private static bool running = true;
         private static Config OBConfig;
 
         static void Main() {
+
+            Console.Title = "OBSCurrentSong";
 
             if( !File.Exists( "config.json" ) ) {
 
                 Console.WriteLine( "No config file found. Creating..." );
 
                 OBConfig = new Config();
-                string contents = JsonConvert.SerializeObject( OBConfig, Formatting.Indented );
-                File.WriteAllText( "config.json", contents );
+                File.WriteAllText( "config.json", JsonConvert.SerializeObject( OBConfig, Formatting.Indented ) );
 
             } else
-                OBConfig = JsonConvert.DeserializeObject<Config>( File.ReadAllText( "config.json" ) );
+                OBConfig = ReadConfigJson();
 
             if( !File.Exists( "temp" ) ) {
 
@@ -51,75 +49,104 @@ namespace OBSCurrentSong
                 File.WriteAllText( "temp", "" );
                 Process.Start( "support.html" );
 
-            } else
-                OBConfig = JsonConvert.DeserializeObject<Config>( File.ReadAllText( "config.json" ) );
+            }
 
-            Console.Title = "OBSCurrentSong";
-            string text = "";
-            Console.WriteLine( "Ready... and waiting!" );
+            // Pausing so the user can read about whatever just happened.
+            if( !running ) {
+                Console.WriteLine( "\nPress any key to continue . . ." );
+                Console.Read();
 
-            for(; ; )
-            {
-                try {
+                running = true;
+            }
 
-                    Process[] processesByName = Process.GetProcessesByName( "Spotify" );
+            Console.Clear();
+            Console.WriteLine( "Ready... and waiting!\n" );
 
-                    if( processesByName.Length == 0 ) {
+            string text = "",
+                artistName, songName, fullName;
+
+            while( true ) {
+
+                Process[] processesByName = Process.GetProcessesByName( "Spotify" );
+
+                if( processesByName.Length == 0 ) {
+                    Console.Clear();
+                    Console.WriteLine( "Please start Spotify." );
+
+                    File.WriteAllText( "./currentsong.txt", "" );
+                    File.WriteAllText( "./artist.txt", "" );
+                    File.WriteAllText( "./song.txt", "" );
+                }
+
+                for( int i = 0; i < processesByName.Length; i++ ) {
+
+                    string mainWindowTitle = processesByName[ i ].MainWindowTitle;
+
+                    if( mainWindowTitle != "" && mainWindowTitle != text ) {
+
                         Console.Clear();
-                        Console.WriteLine( "Please start Spotify." );
-                        File.WriteAllText( "./currentsong.txt", "" );
-                        File.WriteAllText( "./artist.txt", "" );
-                        File.WriteAllText( "./song.txt", "" );
-                    }
 
-                    Process[] array = processesByName;
+                        if( mainWindowTitle != "Spotify" && mainWindowTitle != "Spotify Free" && mainWindowTitle != "Spotify Premium" ) {
 
-                    for( int i = 0; i < array.Length; i++ ) {
+                            artistName = mainWindowTitle.Substring( 0, mainWindowTitle.IndexOf( " - " ) );
+                            songName = mainWindowTitle.Substring( 3 + artistName.Length );
+                            fullName =
+                                OBConfig.prefix +
+                                songName +
+                                OBConfig.separator +
+                                artistName +
+                                OBConfig.postfix;
 
-                        string mainWindowTitle = array[ i ].MainWindowTitle;
+                            File.WriteAllText( "./artist.txt", artistName );
+                            File.WriteAllText( "./song.txt", songName );
+                            File.WriteAllText( "./currentsong.txt", fullName );
 
-                        if( mainWindowTitle != "" && mainWindowTitle != text ) {
+                            Console.Write( "Artist:\nSong:" );
 
-                            Console.Clear();
-                            string[] array2 = mainWindowTitle.Split( new char[] { '-' }, 2 );
+                            Console.SetCursorPosition( 10, 0 );
+                            Console.Write( artistName );
 
-                            if( array2[ 0 ] != "Spotify" && array2[ 0 ] != "Spotify Free" && array2[ 0 ] != "Spotify Premium" ) {
+                            Console.SetCursorPosition( 10, 1 );
+                            Console.Write( songName );
 
-                                File.WriteAllText( "./artist.txt", array2[ 0 ] );
-                                File.WriteAllText( "./song.txt", array2[ 1 ].TrimStart( new char[] { ' ' } ) );
+                            Console.WriteLine( $"\n\nOutput:\n{fullName}" );
+                            Console.WriteLine( $"\nPrev song:\n{text}" );
+                            text = mainWindowTitle;
 
-                                File.WriteAllText( "./currentsong.txt", string.Concat( new string[]
-                                {
-                                    OBConfig.subprefix,
-                                    array2[1].TrimStart(new char[] { ' ' }),
-                                    OBConfig.separator,
-                                    array2[0],
-                                    OBConfig.spacing
-                                } ) );
+                        } else {
 
-                                Console.WriteLine( "Currently playing: " + mainWindowTitle );
-                                Console.Title = "OBSCurrentSong | Currently playing: " + mainWindowTitle;
-                                Console.WriteLine( "Prev song: " + text );
-                                text = mainWindowTitle;
+                            File.WriteAllText( "./artist.txt", "" );
+                            File.WriteAllText( "./song.txt", "" );
+                            File.WriteAllText( "./currentsong.txt", "" );
 
-                            } else {
-
-                                File.WriteAllText( "./artist.txt", "" );
-                                File.WriteAllText( "./song.txt", "" );
-                                File.WriteAllText( "./currentsong.txt", "" );
-
-                                Console.WriteLine( "Currently playing: " );
-                                Console.Title = "OBSCurrentSong | Currently playing: ";
-                                Console.WriteLine( "Prev song: " + text );
-                                text = "";
-                            }
+                            Console.WriteLine( "No playback detected." );
+                            Console.WriteLine( $"\nPrev song: {text}" );
+                            text = "";
                         }
                     }
+                }
 
-                    Thread.Sleep( 3000 );
-
-                } catch( Exception ) { }
+                Thread.Sleep( OBConfig.waittime );
             }
         }
+
+        private static Config ReadConfigJson() {
+            Config output;
+
+            try {
+                output = JsonConvert.DeserializeObject<Config>( File.ReadAllText( "config.json" ) );
+
+            } catch( Exception ) {
+                output = new Config();
+
+                Console.WriteLine( "Problem when reading from \"config.json\". File will be recreated." );
+                File.WriteAllText( "config.json", JsonConvert.SerializeObject( output, Formatting.Indented ) );
+
+                running = false;
+            }
+
+            return output;
+        }
+
     }
 }
