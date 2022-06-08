@@ -1,0 +1,10 @@
+# Directories
+/OBSCurrentSong/.vs
+/OBSCurrentSong/bin
+/OBSCurrentSong/obj
+/OBSCurrentSong/packages
+/OBSCurrentSong/Properties
+
+# Loose files
+*.csproj
+*.sln
