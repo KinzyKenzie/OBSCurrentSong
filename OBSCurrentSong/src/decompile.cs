@@ -1,3 +1,9 @@
+/// OBSCurrentSong Project by Rotinx
+/// https://github.com/Rotinx/OBSCurrentSong
+/// 
+/// Decompiled with dnSpy
+/// Sourced from OBSCurrentSong Release V1.28
+
 using System;
 using System.Diagnostics;
 using System.IO;
