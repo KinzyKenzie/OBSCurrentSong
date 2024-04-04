@@ -1,7 +1,7 @@
-﻿/// OBSCurrentSong Project by Rotinx
+﻿/// OBSCurrentSong Project by Rotinx (2019 version)
 /// https://github.com/Rotinx/OBSCurrentSong
 /// 
-/// Improvements made by KinzyKenzie
+/// Improvements made by KinzyKenzie (2022 fork)
 /// https://github.com/KinzyKenzie/OBSCurrentSong
 /// 
 /// Old code sourced through dnSpy from OBSCurrentSong Release V1.28
@@ -17,24 +17,32 @@ namespace OBSCurrentSong
 
     public class Config
     {
-        public int waittime = 3000;
-        public string prefix = null;
-        public string separator = " by ";
+        public int waittime = 2000;
+        public string prefix = "\"";
+        public string separator = "\", by ";
         public string postfix = null;
     }
 
     class Program
     {
-        private static bool running = true;
+        enum ProcessState
+        {
+            Initial, Waiting, Launched, Listening
+        }
+
+        private static ProcessState currentState = ProcessState.Initial;
         private static Config OBConfig;
 
         static void Main() {
 
             Console.Title = "OBSCurrentSong";
 
+            if( !Directory.Exists( "text" ) )
+                Directory.CreateDirectory( "text" );
+
             if( !File.Exists( "config.json" ) ) {
 
-                Console.WriteLine( "No config file found. Creating..." );
+                Console.WriteLine( "No config file found. Creating...\n" );
 
                 OBConfig = new Config();
                 File.WriteAllText( "config.json", JsonConvert.SerializeObject( OBConfig, Formatting.Indented ) );
@@ -42,40 +50,30 @@ namespace OBSCurrentSong
             } else
                 OBConfig = ReadConfigJson();
 
-            if( !File.Exists( "temp" ) ) {
-
-                Console.WriteLine( "Looks like this is your first time launching. Opening support page..." );
-
-                File.WriteAllText( "temp", "" );
-                Process.Start( "support.html" );
-
-            }
-
-            // Pausing so the user can read about whatever just happened.
-            if( !running ) {
-                Console.WriteLine( "\nPress any key to continue . . ." );
-                Console.Read();
-
-                running = true;
-            }
-
-            Console.Clear();
             Console.WriteLine( "Ready... and waiting!\n" );
 
             string text = "",
-                artistName, songName, fullName;
+                   fullName = "",
+                   prevName = "",
+                   artistName, songName;
 
             while( true ) {
 
                 Process[] processesByName = Process.GetProcessesByName( "Spotify" );
 
-                if( processesByName.Length == 0 ) {
-                    Console.Clear();
+                if( processesByName.Length == 0 && currentState != ProcessState.Waiting ) {
+
+                    if( currentState != ProcessState.Initial )
+                        Console.Clear();
+
                     Console.WriteLine( "Please start Spotify." );
 
-                    File.WriteAllText( "./currentsong.txt", "" );
-                    File.WriteAllText( "./artist.txt", "" );
-                    File.WriteAllText( "./song.txt", "" );
+                    File.WriteAllText( "./text/artist.txt", "" );
+                    File.WriteAllText( "./text/currentsong.txt", "" );
+                    File.WriteAllText( "./text/previoussong.txt", "" );
+                    File.WriteAllText( "./text/song.txt", "" );
+
+                    currentState = ProcessState.Waiting;
                 }
 
                 for( int i = 0; i < processesByName.Length; i++ ) {
@@ -84,22 +82,29 @@ namespace OBSCurrentSong
 
                     if( mainWindowTitle != "" && mainWindowTitle != text ) {
 
-                        Console.Clear();
-
                         if( mainWindowTitle != "Spotify" && mainWindowTitle != "Spotify Free" && mainWindowTitle != "Spotify Premium" ) {
+
+                            Console.Clear();
 
                             artistName = mainWindowTitle.Substring( 0, mainWindowTitle.IndexOf( " - " ) );
                             songName = mainWindowTitle.Substring( 3 + artistName.Length );
-                            fullName =
+                            string newName =
                                 OBConfig.prefix +
                                 songName +
                                 OBConfig.separator +
                                 artistName +
                                 OBConfig.postfix;
 
-                            File.WriteAllText( "./artist.txt", artistName );
-                            File.WriteAllText( "./song.txt", songName );
-                            File.WriteAllText( "./currentsong.txt", fullName );
+                            // If song was paused and resumed, don't delete relevant info
+                            if( newName != fullName ) {
+                                prevName = fullName;
+                                fullName = newName;
+                            }
+
+                            File.WriteAllText( "./text/artist.txt", artistName );
+                            File.WriteAllText( "./text/currentsong.txt", fullName );
+                            File.WriteAllText( "./text/previoussong.txt", prevName );
+                            File.WriteAllText( "./text/song.txt", songName );
 
                             Console.Write( "Artist:\nSong:" );
 
@@ -110,18 +115,24 @@ namespace OBSCurrentSong
                             Console.Write( songName );
 
                             Console.WriteLine( $"\n\nOutput:\n{fullName}" );
-                            Console.WriteLine( $"\nPrev song:\n{text}" );
+                            Console.WriteLine( $"\nPrev song:\n{prevName}" );
                             text = mainWindowTitle;
 
-                        } else {
+                            currentState = ProcessState.Listening;
 
-                            File.WriteAllText( "./artist.txt", "" );
-                            File.WriteAllText( "./song.txt", "" );
-                            File.WriteAllText( "./currentsong.txt", "" );
+                        } else if( currentState != ProcessState.Launched ) {
+
+                            Console.Clear();
+
+                            File.WriteAllText( "./text/artist.txt", "" );
+                            File.WriteAllText( "./text/song.txt", "" );
+                            File.WriteAllText( "./text/currentsong.txt", "" );
 
                             Console.WriteLine( "No playback detected." );
-                            Console.WriteLine( $"\nPrev song: {text}" );
+                            Console.WriteLine( $"\nPrev song: {fullName}" );
                             text = "";
+
+                            currentState = ProcessState.Launched;
                         }
                     }
                 }
@@ -142,11 +153,11 @@ namespace OBSCurrentSong
                 Console.WriteLine( "Problem when reading from \"config.json\". File will be recreated." );
                 File.WriteAllText( "config.json", JsonConvert.SerializeObject( output, Formatting.Indented ) );
 
-                running = false;
+                Console.WriteLine( "\nPress any key to continue . . ." );
+                Console.Read();
             }
 
             return output;
         }
-
     }
 }
