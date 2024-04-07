@@ -31,7 +31,8 @@ namespace OBSCurrentSong
         }
 
         private static ProcessState currentState = ProcessState.Initial;
-        private static Config OBConfig;
+        private static Config Config;
+        private static string FiledumpConfig, FilecheckConfig;
 
         static void Main() {
 
@@ -40,15 +41,7 @@ namespace OBSCurrentSong
             if( !Directory.Exists( "text" ) )
                 Directory.CreateDirectory( "text" );
 
-            if( !File.Exists( "config.json" ) ) {
-
-                Console.WriteLine( "No config file found. Creating...\n" );
-
-                OBConfig = new Config();
-                File.WriteAllText( "config.json", JsonConvert.SerializeObject( OBConfig, Formatting.Indented ) );
-
-            } else
-                OBConfig = ReadConfigJson();
+            Config = ReadConfigJson();
 
             Console.WriteLine( "Ready... and waiting!\n" );
 
@@ -86,14 +79,19 @@ namespace OBSCurrentSong
 
                             Console.Clear();
 
+                            FilecheckConfig = File.ReadAllText( "./config.json" );
+
+                            if( FiledumpConfig != FilecheckConfig )
+                                Config = ReadConfigJson();
+
                             artistName = mainWindowTitle.Substring( 0, mainWindowTitle.IndexOf( " - " ) );
                             songName = mainWindowTitle.Substring( 3 + artistName.Length );
                             string newName =
-                                OBConfig.prefix +
+                                Config.prefix +
                                 songName +
-                                OBConfig.separator +
+                                Config.separator +
                                 artistName +
-                                OBConfig.postfix;
+                                Config.postfix;
 
                             // If song was paused and resumed, don't delete relevant info
                             if( newName != fullName ) {
@@ -137,26 +135,39 @@ namespace OBSCurrentSong
                     }
                 }
 
-                Thread.Sleep( OBConfig.waittime );
+                Thread.Sleep( Config.waittime );
             }
         }
 
         private static Config ReadConfigJson() {
             Config output;
 
-            try {
-                output = JsonConvert.DeserializeObject<Config>( File.ReadAllText( "config.json" ) );
+            if( !File.Exists( "./config.json" ) ) {
+                Console.WriteLine( "No config file found. Creating...\n" );
 
-            } catch( Exception ) {
                 output = new Config();
+                File.WriteAllText( "./config.json", JsonConvert.SerializeObject( output, Formatting.Indented ) );
 
-                Console.WriteLine( "Problem when reading from \"config.json\". File will be recreated." );
-                File.WriteAllText( "config.json", JsonConvert.SerializeObject( output, Formatting.Indented ) );
+                Thread.Sleep( 200 );
 
-                Console.WriteLine( "\nPress any key to continue . . ." );
-                Console.Read();
+            } else {
+                try {
+                    output = JsonConvert.DeserializeObject<Config>( File.ReadAllText( "./config.json" ) );
+
+                } catch( Exception ) {
+                    output = new Config();
+
+                    Console.WriteLine( "Problem when reading from \"config.json\". File will be recreated." );
+                    File.WriteAllText( "./config.json", JsonConvert.SerializeObject( output, Formatting.Indented ) );
+
+                    Thread.Sleep( 200 );
+
+                    Console.WriteLine( "\nPress any key to continue . . ." );
+                    Console.Read();
+                }
             }
 
+            FiledumpConfig = File.ReadAllText( "./config.json" );
             return output;
         }
     }
