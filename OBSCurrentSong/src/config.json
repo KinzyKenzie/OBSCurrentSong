@@ -1,0 +1,8 @@
+{
+  "waittime": 2000,
+  "trimming": false,
+  
+  "prefix": "\"",
+  "separator": "\", by ",
+  "postfix": "     "
+}
